@@ -19,7 +19,6 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"testing"
@@ -38,18 +37,36 @@ func TestListEnvironments(t *testing.T) {
 			{
 				"id": 1,
 				"name": "review/fix-foo",
+				"description": "test",
 				"slug": "review-fix-foo-dfjre3",
 				"external_url": "https://review-fix-foo-dfjre3.example.gitlab.com",
 				"state": "stopped",
 				"created_at": "2013-10-02T10:12:29Z",
-				"updated_at": "2013-12-02T10:12:29Z"
+				"updated_at": "2013-12-02T10:12:29Z",
+				"cluster_agent": {
+					"id": 1,
+					"name": "agent-1",
+					"config_project": {
+						"id": 20,
+						"description": "",
+						"name": "test",
+						"name_with_namespace": "Administrator / test",
+						"path": "test",
+						"path_with_namespace": "root/test",
+						"created_at": "2013-10-02T10:12:29Z"
+					},
+					"created_at": "2013-10-02T10:12:29Z",
+					"created_by_user_id": 42
+				},
+				"kubernetes_namespace": "flux-system",
+				"flux_resource_path": "HelmRelease/flux-system"
 			}
 		]`)
 	})
 
 	envs, _, err := client.Environments.ListEnvironments(1, &ListEnvironmentsOptions{Name: Ptr("review/fix-foo"), ListOptions: ListOptions{Page: 1, PerPage: 10}})
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	createdAtWant, _ := time.Parse(timeLayout, "2013-10-02T10:12:29Z")
@@ -58,10 +75,27 @@ func TestListEnvironments(t *testing.T) {
 		ID:          1,
 		Name:        "review/fix-foo",
 		Slug:        "review-fix-foo-dfjre3",
+		Description: "test",
 		ExternalURL: "https://review-fix-foo-dfjre3.example.gitlab.com",
 		State:       "stopped",
 		CreatedAt:   &createdAtWant,
 		UpdatedAt:   &updatedAtWant,
+		ClusterAgent: &Agent{
+			ID:   1,
+			Name: "agent-1",
+			ConfigProject: ConfigProject{
+				ID:                20,
+				Name:              "test",
+				NameWithNamespace: "Administrator / test",
+				Path:              "test",
+				PathWithNamespace: "root/test",
+				CreatedAt:         &createdAtWant,
+			},
+			CreatedAt:       &createdAtWant,
+			CreatedByUserID: 42,
+		},
+		KubernetesNamespace: "flux-system",
+		FluxResourcePath:    "HelmRelease/flux-system",
 	}}
 	if !reflect.DeepEqual(want, envs) {
 		t.Errorf("Environments.ListEnvironments returned %+v, want %+v", envs, want)
@@ -76,11 +110,29 @@ func TestGetEnvironment(t *testing.T) {
 		fmt.Fprint(w, `{
 			"id": 1,
 			"name": "review/fix-foo",
+			"description": "test",
 			"slug": "review-fix-foo-dfjre3",
 			"external_url": "https://review-fix-foo-dfjre3.example.gitlab.com",
 			"state": "stopped",
 			"created_at": "2013-10-02T10:12:29Z",
-			"updated_at": "2013-12-02T10:12:29Z"
+			"updated_at": "2013-12-02T10:12:29Z",
+			"cluster_agent": {
+				"id": 1,
+				"name": "agent-1",
+				"config_project": {
+					"id": 20,
+					"description": "",
+					"name": "test",
+					"name_with_namespace": "Administrator / test",
+					"path": "test",
+					"path_with_namespace": "root/test",
+					"created_at": "2013-10-02T10:12:29Z"
+				},
+				"created_at": "2013-10-02T10:12:29Z",
+				"created_by_user_id": 42
+			},
+			"kubernetes_namespace": "flux-system",
+			"flux_resource_path": "HelmRelease/flux-system"
 		}`)
 	})
 
@@ -95,10 +147,27 @@ func TestGetEnvironment(t *testing.T) {
 		ID:          1,
 		Name:        "review/fix-foo",
 		Slug:        "review-fix-foo-dfjre3",
+		Description: "test",
 		ExternalURL: "https://review-fix-foo-dfjre3.example.gitlab.com",
 		State:       "stopped",
 		CreatedAt:   &createdAtWant,
 		UpdatedAt:   &updatedAtWant,
+		ClusterAgent: &Agent{
+			ID:   1,
+			Name: "agent-1",
+			ConfigProject: ConfigProject{
+				ID:                20,
+				Name:              "test",
+				NameWithNamespace: "Administrator / test",
+				Path:              "test",
+				PathWithNamespace: "root/test",
+				CreatedAt:         &createdAtWant,
+			},
+			CreatedAt:       &createdAtWant,
+			CreatedByUserID: 42,
+		},
+		KubernetesNamespace: "flux-system",
+		FluxResourcePath:    "HelmRelease/flux-system",
 	}
 	if !reflect.DeepEqual(want, env) {
 		t.Errorf("Environments.GetEnvironment returned %+v, want %+v", env, want)
@@ -114,18 +183,68 @@ func TestCreateEnvironment(t *testing.T) {
 		fmt.Fprint(w, `{
       "id": 1,
       "name": "deploy",
+	  "description": "test",
       "slug": "deploy",
       "external_url": "https://deploy.example.gitlab.com",
-      "tier": "production"
+      "tier": "production",
+      "cluster_agent": {
+        "id": 1,
+        "name": "agent-1",
+        "config_project": {
+          "id": 20,
+          "description": "",
+          "name": "test",
+          "name_with_namespace": "Administrator / test",
+          "path": "test",
+          "path_with_namespace": "root/test",
+          "created_at": "2013-10-02T10:12:29Z"
+        },
+        "created_at": "2013-10-02T10:12:29Z",
+        "created_by_user_id": 42
+      },
+      "kubernetes_namespace": "flux-system",
+      "flux_resource_path": "HelmRelease/flux-system"
     }`)
 	})
 
-	envs, _, err := client.Environments.CreateEnvironment(1, &CreateEnvironmentOptions{Name: Ptr("deploy"), ExternalURL: Ptr("https://deploy.example.gitlab.com"), Tier: Ptr("production")})
+	envs, _, err := client.Environments.CreateEnvironment(1, &CreateEnvironmentOptions{
+		Name:                Ptr("deploy"),
+		Description:         Ptr("test"),
+		ExternalURL:         Ptr("https://deploy.example.gitlab.com"),
+		Tier:                Ptr("production"),
+		ClusterAgentID:      Ptr(1),
+		KubernetesNamespace: Ptr("flux-system"),
+		FluxResourcePath:    Ptr("HelmRelease/flux-system"),
+	})
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
-	want := &Environment{ID: 1, Name: "deploy", Slug: "deploy", ExternalURL: "https://deploy.example.gitlab.com", Tier: "production"}
+	createdAtWant, _ := time.Parse(timeLayout, "2013-10-02T10:12:29Z")
+	want := &Environment{
+		ID:          1,
+		Name:        "deploy",
+		Slug:        "deploy",
+		Description: "test",
+		ExternalURL: "https://deploy.example.gitlab.com",
+		Tier:        "production",
+		ClusterAgent: &Agent{
+			ID:   1,
+			Name: "agent-1",
+			ConfigProject: ConfigProject{
+				ID:                20,
+				Name:              "test",
+				NameWithNamespace: "Administrator / test",
+				Path:              "test",
+				PathWithNamespace: "root/test",
+				CreatedAt:         &createdAtWant,
+			},
+			CreatedAt:       &createdAtWant,
+			CreatedByUserID: 42,
+		},
+		KubernetesNamespace: "flux-system",
+		FluxResourcePath:    "HelmRelease/flux-system",
+	}
 	if !reflect.DeepEqual(want, envs) {
 		t.Errorf("Environments.CreateEnvironment returned %+v, want %+v", envs, want)
 	}
@@ -140,18 +259,68 @@ func TestEditEnvironment(t *testing.T) {
 		fmt.Fprint(w, `{
       "id": 1,
       "name": "staging",
+	  "description": "test",
       "slug": "staging",
       "external_url": "https://staging.example.gitlab.com",
-      "tier": "staging"
+      "tier": "staging",
+      "cluster_agent": {
+        "id": 1,
+        "name": "agent-1",
+        "config_project": {
+          "id": 20,
+          "description": "",
+          "name": "test",
+          "name_with_namespace": "Administrator / test",
+          "path": "test",
+          "path_with_namespace": "root/test",
+          "created_at": "2013-10-02T10:12:29Z"
+        },
+        "created_at": "2013-10-02T10:12:29Z",
+        "created_by_user_id": 42
+    },
+	  "kubernetes_namespace": "flux-system",
+	  "flux_resource_path": "HelmRelease/flux-system"
     }`)
 	})
 
-	envs, _, err := client.Environments.EditEnvironment(1, 1, &EditEnvironmentOptions{Name: Ptr("staging"), ExternalURL: Ptr("https://staging.example.gitlab.com"), Tier: Ptr("staging")})
+	envs, _, err := client.Environments.EditEnvironment(1, 1, &EditEnvironmentOptions{
+		Name:                Ptr("staging"),
+		Description:         Ptr("test"),
+		ExternalURL:         Ptr("https://staging.example.gitlab.com"),
+		Tier:                Ptr("staging"),
+		ClusterAgentID:      Ptr(1),
+		KubernetesNamespace: Ptr("flux-system"),
+		FluxResourcePath:    Ptr("HelmRelease/flux-system"),
+	})
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
-	want := &Environment{ID: 1, Name: "staging", Slug: "staging", ExternalURL: "https://staging.example.gitlab.com", Tier: "staging"}
+	createdAtWant, _ := time.Parse(timeLayout, "2013-10-02T10:12:29Z")
+	want := &Environment{
+		ID:          1,
+		Name:        "staging",
+		Slug:        "staging",
+		Description: "test",
+		ExternalURL: "https://staging.example.gitlab.com",
+		Tier:        "staging",
+		ClusterAgent: &Agent{
+			ID:   1,
+			Name: "agent-1",
+			ConfigProject: ConfigProject{
+				ID:                20,
+				Name:              "test",
+				NameWithNamespace: "Administrator / test",
+				Path:              "test",
+				PathWithNamespace: "root/test",
+				CreatedAt:         &createdAtWant,
+			},
+			CreatedAt:       &createdAtWant,
+			CreatedByUserID: 42,
+		},
+		KubernetesNamespace: "flux-system",
+		FluxResourcePath:    "HelmRelease/flux-system",
+	}
 	if !reflect.DeepEqual(want, envs) {
 		t.Errorf("Environments.EditEnvironment returned %+v, want %+v", envs, want)
 	}
@@ -166,7 +335,7 @@ func TestDeleteEnvironment(t *testing.T) {
 	})
 	_, err := client.Environments.DeleteEnvironment(1, 1)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 }
 
@@ -185,9 +354,9 @@ func TestStopEnvironment(t *testing.T) {
       "tier": "staging"
     }`)
 	})
-	_, _, err := client.Environments.StopEnvironment(1, 1)
+	_, _, err := client.Environments.StopEnvironment(1, 1, &StopEnvironmentOptions{})
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 }
 
@@ -196,6 +365,7 @@ func TestUnmarshal(t *testing.T) {
     {
         "id": 10,
         "name": "production",
+		"description": "test",
         "slug": "production",
         "external_url": "https://example.com",
         "project": {
@@ -236,6 +406,7 @@ func TestUnmarshal(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, 10, env.ID)
 		assert.Equal(t, "production", env.Name)
+		assert.Equal(t, "test", env.Description)
 		assert.Equal(t, "https://example.com", env.ExternalURL)
 		assert.Equal(t, "available", env.State)
 		if assert.NotNil(t, env.Project) {

@@ -35,7 +35,7 @@ const (
 )
 
 func TestBuildEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/build.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/build.json")
 
 	var event *BuildEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -65,7 +65,7 @@ func TestBuildEventUnmarshal(t *testing.T) {
 }
 
 func TestCommitCommentEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/note_commit.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/note_commit.json")
 
 	var event *CommitCommentEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -101,13 +101,17 @@ func TestCommitCommentEventUnmarshal(t *testing.T) {
 		t.Errorf("NoteableType is %v, want %v", event.ObjectAttributes.NoteableType, "Commit")
 	}
 
+	if event.ObjectAttributes.Action != CommentEventActionCreate {
+		t.Errorf("Action is %v, want %v", event.ObjectAttributes.Action, "create")
+	}
+
 	if event.Commit.Title != "Add submodule" {
 		t.Errorf("Issue title is %v, want %v", event.Commit.Title, "Add submodule")
 	}
 }
 
 func TestJobEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/job.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/job.json")
 
 	var event *JobEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -191,7 +195,7 @@ func TestJobEventUnmarshal(t *testing.T) {
 }
 
 func TestDeploymentEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/deployment.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/deployment.json")
 
 	var event *DeploymentEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -241,7 +245,7 @@ func TestDeploymentEventUnmarshal(t *testing.T) {
 }
 
 func TestFeatureFlagEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/feature_flag.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/feature_flag.json")
 
 	var event *FeatureFlagEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -286,8 +290,43 @@ func TestFeatureFlagEventUnmarshal(t *testing.T) {
 	}
 }
 
+func TestGroupResourceAccessTokenEventUnmarshal(t *testing.T) {
+	jsonObject := loadFixture(t, "testdata/webhooks/resource_access_token_group.json")
+	var event *GroupResourceAccessTokenEvent
+	err := json.Unmarshal(jsonObject, &event)
+	if err != nil {
+		t.Errorf("could not unmarshal event: %v\n ", err.Error())
+	}
+
+	if event == nil {
+		t.Errorf("event is null")
+	}
+
+	expiresAt, err := ParseISOTime("2024-01-26")
+	if err != nil {
+		t.Fatalf("could not parse ISO time: %v", err)
+	}
+
+	expected := &GroupResourceAccessTokenEvent{
+		ObjectKind: "access_token",
+		EventName:  "expiring_access_token",
+	}
+
+	expected.Group.GroupID = 35
+	expected.Group.GroupName = "Twitter"
+	expected.Group.GroupPath = "twitter"
+
+	expected.ObjectAttributes.ID = 25
+	expected.ObjectAttributes.UserID = 90
+	expected.ObjectAttributes.Name = "acd"
+	expected.ObjectAttributes.CreatedAt = "2024-01-24 16:27:40 UTC"
+	expected.ObjectAttributes.ExpiresAt = &expiresAt
+
+	assert.Equal(t, expected, event)
+}
+
 func TestIssueCommentEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/note_issue.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/note_issue.json")
 
 	var event *IssueCommentEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -313,6 +352,10 @@ func TestIssueCommentEventUnmarshal(t *testing.T) {
 
 	if event.ObjectAttributes.NoteableType != "Issue" {
 		t.Errorf("NoteableType is %v, want %v", event.ObjectAttributes.NoteableType, "Issue")
+	}
+
+	if event.ObjectAttributes.Action != CommentEventActionCreate {
+		t.Errorf("Action is %v, want %v", event.ObjectAttributes.Action, "create")
 	}
 
 	if event.Issue.Title != "test_issue" {
@@ -360,7 +403,7 @@ func TestIssueCommentEventUnmarshal(t *testing.T) {
 }
 
 func TestIssueEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/issue.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/issue.json")
 
 	var event *IssueEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -488,7 +531,7 @@ func TestIssueEventUnmarshal(t *testing.T) {
 
 // Generate unit test for MergeCommentEvent
 func TestMergeCommentEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/note_merge_request.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/note_merge_request.json")
 
 	var event *MergeCommentEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -510,6 +553,10 @@ func TestMergeCommentEventUnmarshal(t *testing.T) {
 
 	if event.ObjectAttributes.NoteableType != "MergeRequest" {
 		t.Errorf("ObjectAttributes.NoteableType is %v, want %v", event.ObjectAttributes.NoteableType, "MergeRequest")
+	}
+
+	if event.ObjectAttributes.Action != CommentEventActionCreate {
+		t.Errorf("Action is %v, want %v", event.ObjectAttributes.Action, "create")
 	}
 
 	if event.ObjectAttributes.AuthorID != 1 {
@@ -606,7 +653,7 @@ func TestMergeCommentEventUnmarshal(t *testing.T) {
 }
 
 func TestMergeEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/merge_request.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/merge_request.json")
 
 	var event *MergeEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -798,7 +845,7 @@ func TestMergeEventUnmarshal(t *testing.T) {
 }
 
 func TestMemberEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/member.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/member.json")
 
 	var event *MemberEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -867,7 +914,7 @@ func TestMemberEventUnmarshal(t *testing.T) {
 }
 
 func TestMergeEventUnmarshalFromGroup(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/group_merge_request.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/group_merge_request.json")
 
 	var event *MergeEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -921,7 +968,7 @@ func TestMergeEventUnmarshalFromGroup(t *testing.T) {
 }
 
 func TestPipelineEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/pipeline.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/pipeline.json")
 
 	var event *PipelineEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -1014,8 +1061,56 @@ func TestPipelineEventUnmarshal(t *testing.T) {
 	}
 }
 
+func TestProjectResourceAccessTokenEventUnmarshal(t *testing.T) {
+	jsonObject := loadFixture(t, "testdata/webhooks/resource_access_token_project.json")
+	var event *ProjectResourceAccessTokenEvent
+	err := json.Unmarshal(jsonObject, &event)
+	if err != nil {
+		t.Errorf("could not unmarshal event: %v\n ", err.Error())
+	}
+
+	if event == nil {
+		t.Errorf("event is null")
+	}
+
+	expiresAt, err := ParseISOTime("2024-01-26")
+	if err != nil {
+		t.Fatalf("could not parse ISO time: %v", err)
+	}
+
+	expected := &ProjectResourceAccessTokenEvent{
+		ObjectKind: "access_token",
+		EventName:  "expiring_access_token",
+	}
+
+	expected.ObjectAttributes.ID = 25
+	expected.ObjectAttributes.UserID = 90
+	expected.ObjectAttributes.Name = "acd"
+	expected.ObjectAttributes.CreatedAt = "2024-01-24 16:27:40 UTC"
+	expected.ObjectAttributes.ExpiresAt = &expiresAt
+
+	expected.Project.ID = 7
+	expected.Project.Name = "Flight"
+	expected.Project.Description = "Eum dolore maxime atque reprehenderit voluptatem."
+	expected.Project.WebURL = "https://example.com/flightjs/Flight"
+	expected.Project.AvatarURL = ""
+	expected.Project.GitSSHURL = "ssh://git@example.com/flightjs/Flight.git"
+	expected.Project.GitHTTPURL = "https://example.com/flightjs/Flight.git"
+	expected.Project.Namespace = "Flightjs"
+	expected.Project.VisibilityLevel = 0
+	expected.Project.PathWithNamespace = "flightjs/Flight"
+	expected.Project.DefaultBranch = "master"
+	expected.Project.CIConfigPath = ""
+	expected.Project.Homepage = "https://example.com/flightjs/Flight"
+	expected.Project.URL = "ssh://git@example.com/flightjs/Flight.git"
+	expected.Project.SSHURL = "ssh://git@example.com/flightjs/Flight.git"
+	expected.Project.HTTPURL = "https://example.com/flightjs/Flight.git"
+
+	assert.Equal(t, expected, event)
+}
+
 func TestPushEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/push.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/push.json")
 	var event *PushEvent
 	err := json.Unmarshal(jsonObject, &event)
 	if err != nil {
@@ -1060,7 +1155,7 @@ func TestPushEventUnmarshal(t *testing.T) {
 }
 
 func TestReleaseEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/release.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/release.json")
 
 	var event *ReleaseEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -1102,7 +1197,7 @@ func TestReleaseEventUnmarshal(t *testing.T) {
 }
 
 func TestSubGroupEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/subgroup.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/subgroup.json")
 
 	var event *SubGroupEvent
 	err := json.Unmarshal(jsonObject, &event)
@@ -1132,7 +1227,7 @@ func TestSubGroupEventUnmarshal(t *testing.T) {
 }
 
 func TestTagEventUnmarshal(t *testing.T) {
-	jsonObject := loadFixture("testdata/webhooks/tag_push.json")
+	jsonObject := loadFixture(t, "testdata/webhooks/tag_push.json")
 	var event *TagEvent
 	err := json.Unmarshal(jsonObject, &event)
 	if err != nil {

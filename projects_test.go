@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -276,6 +277,58 @@ func TestListOwnedProjects(t *testing.T) {
 	}
 }
 
+func TestEditProject(t *testing.T) {
+	mux, client := setup(t)
+
+	var developerRole AccessControlValue = "developer"
+	developerPipelineVariablesRole := CIPipelineVariablesDeveloperRole
+	opt := &EditProjectOptions{
+		CIRestrictPipelineCancellationRole:     Ptr(developerRole),
+		CIPipelineVariablesMinimumOverrideRole: Ptr(developerPipelineVariablesRole),
+	}
+
+	// Store whether we've seen all the attributes we set
+	attributesFound := false
+
+	mux.HandleFunc("/api/v4/projects/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+
+		// Check that our request properly included ci_restrict_pipeline_cancellation_role
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Unable to read body properly. Error: %v", err)
+		}
+
+		// Set the value to check if our value is included
+		attributesFound = strings.Contains(string(body), "ci_restrict_pipeline_cancellation_role") &&
+			strings.Contains(string(body), "ci_pipeline_variables_minimum_override_role")
+
+		// Print the start of the mock example from https://docs.gitlab.com/ee/api/projects.html#edit-project
+		// including the attribute we edited
+		fmt.Fprint(w, `
+		{
+			"id": 1,
+			"description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+			"description_html": "<p data-sourcepos=\"1:1-1:56\" dir=\"auto\">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>",
+			"default_branch": "main",
+			"visibility": "private",
+			"ssh_url_to_repo": "git@example.com:diaspora/diaspora-project-site.git",
+			"http_url_to_repo": "http://example.com/diaspora/diaspora-project-site.git",
+			"web_url": "http://example.com/diaspora/diaspora-project-site",
+			"readme_url": "http://example.com/diaspora/diaspora-project-site/blob/main/README.md",
+			"ci_restrict_pipeline_cancellation_role": "developer",
+			"ci_pipeline_variables_minimum_override_role": "developer"
+		}`)
+	})
+
+	project, resp, err := client.Projects.EditProject(1, opt)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, true, attributesFound)
+	assert.Equal(t, developerRole, project.CIRestrictPipelineCancellationRole)
+	assert.Equal(t, developerPipelineVariablesRole, project.CIPipelineVariablesMinimumOverrideRole)
+}
+
 func TestListStarredProjects(t *testing.T) {
 	mux, client := setup(t)
 
@@ -323,6 +376,10 @@ func TestGetProjectByID(t *testing.T) {
 			  "name_regex_keep": null,
 			  "next_run_at": "2020-01-07T21:42:58.658Z"
 			},
+			"ci_forward_deployment_enabled": true,
+			"ci_forward_deployment_rollback_allowed": true,
+			"ci_restrict_pipeline_cancellation_role": "developer",
+			"ci_pipeline_variables_minimum_override_role": "no_one_allowed",
 			"packages_enabled": false,
 			"build_coverage_regex": "Total.*([0-9]{1,3})%"
 		  }`)
@@ -336,8 +393,12 @@ func TestGetProjectByID(t *testing.T) {
 			Cadence:   "7d",
 			NextRunAt: &wantTimestamp,
 		},
-		PackagesEnabled:    false,
-		BuildCoverageRegex: `Total.*([0-9]{1,3})%`,
+		PackagesEnabled:                        false,
+		BuildCoverageRegex:                     `Total.*([0-9]{1,3})%`,
+		CIForwardDeploymentEnabled:             true,
+		CIForwardDeploymentRollbackAllowed:     true,
+		CIRestrictPipelineCancellationRole:     "developer",
+		CIPipelineVariablesMinimumOverrideRole: "no_one_allowed",
 	}
 
 	project, _, err := client.Projects.GetProject(1, nil)
@@ -387,7 +448,8 @@ func TestGetProjectWithOptions(t *testing.T) {
 				"pipeline_artifacts_size": 0,
 				"packages_size": 238906167,
 				"snippets_size": 146800,
-				"uploads_size": 6523619
+				"uploads_size": 6523619,
+				"container_registry_size": 284453
 			}}`)
 	})
 	want := &Project{ID: 1, Statistics: &Statistics{
@@ -401,6 +463,7 @@ func TestGetProjectWithOptions(t *testing.T) {
 		PackagesSize:          238906167,
 		SnippetsSize:          146800,
 		UploadsSize:           6523619,
+		ContainerRegistrySize: 284453,
 	}}
 
 	project, _, err := client.Projects.GetProject(1, &GetProjectOptions{Statistics: Ptr(true)})
@@ -588,6 +651,24 @@ func TestListProjectForks(t *testing.T) {
 	want := []*Project{{ID: 1}, {ID: 2}}
 	if !reflect.DeepEqual(want, projects) {
 		t.Errorf("Projects.ListProjects returned %+v, want %+v", projects, want)
+	}
+}
+
+func TestDeleteProject(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	opt := &DeleteProjectOptions{
+		FullPath:          Ptr("group/project"),
+		PermanentlyRemove: Ptr(true),
+	}
+
+	_, err := client.Projects.DeleteProject(1, opt)
+	if err != nil {
+		t.Errorf("Projects.DeleteProject returned error: %v", err)
 	}
 }
 
@@ -1413,4 +1494,467 @@ func TestProjectModelsOptionalMergeAttribute(t *testing.T) {
 		t.Fatal("Failed to marshal object", err)
 	}
 	assert.False(t, strings.Contains(string(jsonString), "only_allow_merge_if_all_status_checks_passed"))
+}
+
+func TestListProjectHooks(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/hooks", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `[
+	{
+		"id": 1,
+		"url": "http://example.com/hook",
+		"name": "This is the name of an example hook",
+		"description": "This is the description of an example hook",
+		"confidential_note_events": true,
+		"project_id": 1,
+		"push_events": true,
+		"push_events_branch_filter": "main",
+		"issues_events": true,
+		"confidential_issues_events": true,
+		"merge_requests_events": true,
+		"tag_push_events": true,
+		"note_events": true,
+		"job_events": true,
+		"pipeline_events": true,
+		"wiki_page_events": true,
+		"deployment_events": true,
+		"releases_events": true,
+		"enable_ssl_verification": true,
+		"alert_status": "executable",
+		"created_at": "2024-10-13T13:37:00Z",
+		"resource_access_token_events": true,
+		"custom_webhook_template": "my custom template",
+		"custom_headers": [
+			{"key": "Authorization"},
+			{"key": "OtherHeader"}
+		]
+	}
+]`)
+	})
+
+	hooks, _, err := client.Projects.ListProjectHooks(1, nil)
+	if err != nil {
+		t.Errorf("Projects.ListProjectHooks returned error: %v", err)
+	}
+
+	createdAt := time.Date(2024, 10, 13, 13, 37, 0, 0, time.UTC)
+	want := []*ProjectHook{{
+		ID:                        1,
+		URL:                       "http://example.com/hook",
+		Name:                      "This is the name of an example hook",
+		Description:               "This is the description of an example hook",
+		ConfidentialNoteEvents:    true,
+		ProjectID:                 1,
+		PushEvents:                true,
+		PushEventsBranchFilter:    "main",
+		IssuesEvents:              true,
+		ConfidentialIssuesEvents:  true,
+		MergeRequestsEvents:       true,
+		TagPushEvents:             true,
+		NoteEvents:                true,
+		JobEvents:                 true,
+		PipelineEvents:            true,
+		WikiPageEvents:            true,
+		DeploymentEvents:          true,
+		ReleasesEvents:            true,
+		EnableSSLVerification:     true,
+		CreatedAt:                 &createdAt,
+		AlertStatus:               "executable",
+		ResourceAccessTokenEvents: true,
+		CustomWebhookTemplate:     "my custom template",
+		CustomHeaders: []*HookCustomHeader{
+			{
+				Key: "Authorization",
+			},
+			{
+				Key: "OtherHeader",
+			},
+		},
+	}}
+
+	if !reflect.DeepEqual(hooks, want) {
+		t.Errorf("Projects.ListProjectHooks returned \ngot:\n%v\nwant:\n%v", Stringify(hooks), Stringify(want))
+	}
+}
+
+// Test that the "CustomWebhookTemplate" serializes properly
+func TestProjectAddWebhook_CustomTemplateStuff(t *testing.T) {
+	mux, client := setup(t)
+	customWebhookSet := false
+	authValueSet := false
+
+	mux.HandleFunc("/api/v4/projects/1/hooks",
+		func(w http.ResponseWriter, r *http.Request) {
+			testMethod(t, r, http.MethodPost)
+			w.WriteHeader(http.StatusCreated)
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("Unable to read body properly. Error: %v", err)
+			}
+			customWebhookSet = strings.Contains(string(body), "custom_webhook_template")
+			authValueSet = strings.Contains(string(body), `"value":"stuff"`)
+
+			fmt.Fprint(w, `{
+				"custom_webhook_template": "testValue",
+				"custom_headers": [
+					{
+						"key": "Authorization"
+					},
+					{
+						"key": "Favorite-Pet"
+					}
+				]
+			}`)
+		},
+	)
+
+	hook, resp, err := client.Projects.AddProjectHook(1, &AddProjectHookOptions{
+		CustomWebhookTemplate: Ptr(`{"example":"{{object_kind}}"}`),
+		CustomHeaders: &[]*HookCustomHeader{
+			{
+				Key:   "Authorization",
+				Value: "stuff",
+			},
+			{
+				Key:   "Favorite-Pet",
+				Value: "Cats",
+			},
+		},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, true, customWebhookSet)
+	assert.Equal(t, true, authValueSet)
+	assert.Equal(t, "testValue", hook.CustomWebhookTemplate)
+	assert.Equal(t, 2, len(hook.CustomHeaders))
+}
+
+// Test that the "CustomWebhookTemplate" serializes properly when editing
+func TestProjectEditWebhook_CustomTemplateStuff(t *testing.T) {
+	mux, client := setup(t)
+	customWebhookSet := false
+	authValueSet := false
+
+	mux.HandleFunc("/api/v4/projects/1/hooks/1",
+		func(w http.ResponseWriter, r *http.Request) {
+			testMethod(t, r, http.MethodPut)
+			w.WriteHeader(http.StatusOK)
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("Unable to read body properly. Error: %v", err)
+			}
+			customWebhookSet = strings.Contains(string(body), "custom_webhook_template")
+			authValueSet = strings.Contains(string(body), `"value":"stuff"`)
+
+			fmt.Fprint(w, `{
+				"custom_webhook_template": "testValue",
+				"custom_headers": [
+					{
+						"key": "Authorization"
+					},
+					{
+						"key": "Favorite-Pet"
+					}
+				]}`)
+		},
+	)
+
+	hook, resp, err := client.Projects.EditProjectHook(1, 1, &EditProjectHookOptions{
+		CustomWebhookTemplate: Ptr(`{"example":"{{object_kind}}"}`),
+		CustomHeaders: &[]*HookCustomHeader{
+			{
+				Key:   "Authorization",
+				Value: "stuff",
+			},
+			{
+				Key:   "Favorite-Pet",
+				Value: "Cats",
+			},
+		},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, true, customWebhookSet)
+	assert.Equal(t, true, authValueSet)
+	assert.Equal(t, "testValue", hook.CustomWebhookTemplate)
+	assert.Equal(t, 2, len(hook.CustomHeaders))
+}
+
+func TestGetProjectPushRules(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/push_rule", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{
+			"id": 1,
+			"commit_message_regex": "Fixes \\d+\\..*",
+			"commit_message_negative_regex": "ssh\\:\\/\\/",
+			"branch_name_regex": "(feat|fix)\\/*",
+			"deny_delete_tag": false,
+			"member_check": false,
+			"prevent_secrets": false,
+			"author_email_regex": "@company.com$",
+			"file_name_regex": "(jar|exe)$",
+			"max_file_size": 5,
+			"commit_committer_check": false,
+			"commit_committer_name_check": false,
+			"reject_unsigned_commits": false,
+			"reject_non_dco_commits": false
+		  }`)
+	})
+
+	rule, _, err := client.Projects.GetProjectPushRules(1)
+	if err != nil {
+		t.Errorf("Projects.GetProjectPushRules returned error: %v", err)
+	}
+
+	want := &ProjectPushRules{
+		ID:                         1,
+		CommitMessageRegex:         "Fixes \\d+\\..*",
+		CommitMessageNegativeRegex: "ssh\\:\\/\\/",
+		BranchNameRegex:            "(feat|fix)\\/*",
+		DenyDeleteTag:              false,
+		MemberCheck:                false,
+		PreventSecrets:             false,
+		AuthorEmailRegex:           "@company.com$",
+		FileNameRegex:              "(jar|exe)$",
+		MaxFileSize:                5,
+		CommitCommitterCheck:       false,
+		CommitCommitterNameCheck:   false,
+		RejectUnsignedCommits:      false,
+		RejectNonDCOCommits:        false,
+	}
+
+	if !reflect.DeepEqual(want, rule) {
+		t.Errorf("Projects.GetProjectPushRules returned %+v, want %+v", rule, want)
+	}
+}
+
+func TestAddProjectPushRules(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/push_rule", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPost)
+		fmt.Fprint(w, `{
+			"id": 1,
+			"commit_message_regex": "Fixes \\d+\\..*",
+			"commit_message_negative_regex": "ssh\\:\\/\\/",
+			"branch_name_regex": "(feat|fix)\\/*",
+			"deny_delete_tag": false,
+			"member_check": false,
+			"prevent_secrets": false,
+			"author_email_regex": "@company.com$",
+			"file_name_regex": "(jar|exe)$",
+			"max_file_size": 5,
+			"commit_committer_check": false,
+			"commit_committer_name_check": false,
+			"reject_unsigned_commits": false,
+			"reject_non_dco_commits": false
+		  }`)
+	})
+
+	opt := &AddProjectPushRuleOptions{
+		CommitMessageRegex:         Ptr("Fixes \\d+\\..*"),
+		CommitMessageNegativeRegex: Ptr("ssh\\:\\/\\/"),
+		BranchNameRegex:            Ptr("(feat|fix)\\/*"),
+		DenyDeleteTag:              Ptr(false),
+		MemberCheck:                Ptr(false),
+		PreventSecrets:             Ptr(false),
+		AuthorEmailRegex:           Ptr("@company.com$"),
+		FileNameRegex:              Ptr("(jar|exe)$"),
+		MaxFileSize:                Ptr(5),
+		CommitCommitterCheck:       Ptr(false),
+		CommitCommitterNameCheck:   Ptr(false),
+		RejectUnsignedCommits:      Ptr(false),
+		RejectNonDCOCommits:        Ptr(false),
+	}
+
+	rule, _, err := client.Projects.AddProjectPushRule(1, opt)
+	if err != nil {
+		t.Errorf("Projects.AddProjectPushRule returned error: %v", err)
+	}
+
+	want := &ProjectPushRules{
+		ID:                         1,
+		CommitMessageRegex:         "Fixes \\d+\\..*",
+		CommitMessageNegativeRegex: "ssh\\:\\/\\/",
+		BranchNameRegex:            "(feat|fix)\\/*",
+		DenyDeleteTag:              false,
+		MemberCheck:                false,
+		PreventSecrets:             false,
+		AuthorEmailRegex:           "@company.com$",
+		FileNameRegex:              "(jar|exe)$",
+		MaxFileSize:                5,
+		CommitCommitterCheck:       false,
+		CommitCommitterNameCheck:   false,
+		RejectUnsignedCommits:      false,
+		RejectNonDCOCommits:        false,
+	}
+
+	if !reflect.DeepEqual(want, rule) {
+		t.Errorf("Projects.AddProjectPushRule returned %+v, want %+v", rule, want)
+	}
+}
+
+func TestEditProjectPushRules(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/push_rule", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{
+			"id": 1,
+			"commit_message_regex": "Fixes \\d+\\..*",
+			"commit_message_negative_regex": "ssh\\:\\/\\/",
+			"branch_name_regex": "(feat|fix)\\/*",
+			"deny_delete_tag": false,
+			"member_check": false,
+			"prevent_secrets": false,
+			"author_email_regex": "@company.com$",
+			"file_name_regex": "(jar|exe)$",
+			"max_file_size": 5,
+			"commit_committer_check": false,
+			"commit_committer_name_check": false,
+			"reject_unsigned_commits": false,
+			"reject_non_dco_commits": false
+		  }`)
+	})
+
+	opt := &EditProjectPushRuleOptions{
+		CommitMessageRegex:         Ptr("Fixes \\d+\\..*"),
+		CommitMessageNegativeRegex: Ptr("ssh\\:\\/\\/"),
+		BranchNameRegex:            Ptr("(feat|fix)\\/*"),
+		DenyDeleteTag:              Ptr(false),
+		MemberCheck:                Ptr(false),
+		PreventSecrets:             Ptr(false),
+		AuthorEmailRegex:           Ptr("@company.com$"),
+		FileNameRegex:              Ptr("(jar|exe)$"),
+		MaxFileSize:                Ptr(5),
+		CommitCommitterCheck:       Ptr(false),
+		CommitCommitterNameCheck:   Ptr(false),
+		RejectUnsignedCommits:      Ptr(false),
+		RejectNonDCOCommits:        Ptr(false),
+	}
+
+	rule, _, err := client.Projects.EditProjectPushRule(1, opt)
+	if err != nil {
+		t.Errorf("Projects.EditProjectPushRule returned error: %v", err)
+	}
+
+	want := &ProjectPushRules{
+		ID:                         1,
+		CommitMessageRegex:         "Fixes \\d+\\..*",
+		CommitMessageNegativeRegex: "ssh\\:\\/\\/",
+		BranchNameRegex:            "(feat|fix)\\/*",
+		DenyDeleteTag:              false,
+		MemberCheck:                false,
+		PreventSecrets:             false,
+		AuthorEmailRegex:           "@company.com$",
+		FileNameRegex:              "(jar|exe)$",
+		MaxFileSize:                5,
+		CommitCommitterCheck:       false,
+		CommitCommitterNameCheck:   false,
+		RejectUnsignedCommits:      false,
+		RejectNonDCOCommits:        false,
+	}
+
+	if !reflect.DeepEqual(want, rule) {
+		t.Errorf("Projects.EditProjectPushRule returned %+v, want %+v", rule, want)
+	}
+}
+
+func TestGetProjectWebhookHeader(t *testing.T) {
+	mux, client := setup(t)
+
+	// Removed most of the arguments to keep test slim
+	mux.HandleFunc("/api/v4/projects/1/hooks/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{
+			"id": 1,
+			"custom_webhook_template": "{\"event\":\"{{object_kind}}\"}",
+			"custom_headers": [
+			  {
+				"key": "Authorization"
+			  },
+			  {
+				"key": "OtherKey"
+			  }
+			]
+		  }`)
+	})
+
+	hook, _, err := client.Projects.GetProjectHook(1, 1)
+	if err != nil {
+		t.Errorf("Projects.GetProjectHook returned error: %v", err)
+	}
+
+	want := &ProjectHook{
+		ID:                    1,
+		CustomWebhookTemplate: "{\"event\":\"{{object_kind}}\"}",
+		CustomHeaders: []*HookCustomHeader{
+			{
+				Key: "Authorization",
+			},
+			{
+				Key: "OtherKey",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(want, hook) {
+		t.Errorf("Projects.GetProjectHook returned %+v, want %+v", hook, want)
+	}
+}
+
+func TestSetProjectWebhookHeader(t *testing.T) {
+	mux, client := setup(t)
+	var bodyJson map[string]interface{}
+
+	// Removed most of the arguments to keep test slim
+	mux.HandleFunc("/api/v4/projects/1/hooks/1/custom_headers/Authorization", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		w.WriteHeader(http.StatusNoContent)
+
+		// validate that the `value` body is sent properly
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Unable to read body properly. Error: %v", err)
+		}
+
+		// Unmarshal the body into JSON so we can check it
+		_ = json.Unmarshal(body, &bodyJson)
+
+		fmt.Fprint(w, ``)
+	})
+
+	req, err := client.Projects.SetProjectCustomHeader(1, 1, "Authorization", &SetHookCustomHeaderOptions{Value: Ptr("testValue")})
+	if err != nil {
+		t.Errorf("Projects.SetProjectCustomHeader returned error: %v", err)
+	}
+
+	assert.Equal(t, bodyJson["value"], "testValue")
+	assert.Equal(t, http.StatusNoContent, req.StatusCode)
+}
+
+func TestDeleteProjectWebhookHeader(t *testing.T) {
+	mux, client := setup(t)
+
+	// Removed most of the arguments to keep test slim
+	mux.HandleFunc("/api/v4/projects/1/hooks/1/custom_headers/Authorization", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+		w.WriteHeader(http.StatusNoContent)
+		fmt.Fprint(w, ``)
+	})
+
+	req, err := client.Projects.DeleteProjectCustomHeader(1, 1, "Authorization")
+	if err != nil {
+		t.Errorf("Projects.DeleteProjectCustomHeader returned error: %v", err)
+	}
+
+	assert.Equal(t, http.StatusNoContent, req.StatusCode)
 }

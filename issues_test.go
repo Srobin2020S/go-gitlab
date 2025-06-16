@@ -18,7 +18,6 @@ package gitlab
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"testing"
@@ -36,7 +35,7 @@ func TestGetIssue(t *testing.T) {
 
 	issue, _, err := client.Issues.GetIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -62,7 +61,7 @@ func TestGetIssueByID(t *testing.T) {
 
 	issue, _, err := client.Issues.GetIssueByID(5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -88,7 +87,36 @@ func TestDeleteIssue(t *testing.T) {
 
 	_, err := client.Issues.DeleteIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
+	}
+}
+
+func TestReorderIssue(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/issues/5/reorder", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "title" : "Reordered issue", "description": "This is the description of a reordered issue", "author" : {"id" : 1, "name": "corrie"}, "assignees":[{"id":1}]}`)
+	})
+
+	afterID := 100
+	opt := ReorderIssueOptions{MoveAfterID: &afterID}
+
+	issue, _, err := client.Issues.ReorderIssue("1", 5, &opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := &Issue{
+		ID:          1,
+		Title:       "Reordered issue",
+		Description: "This is the description of a reordered issue",
+		Author:      &IssueAuthor{ID: 1, Name: "corrie"},
+		Assignees:   []*IssueAssignee{{ID: 1}},
+	}
+
+	if !reflect.DeepEqual(want, issue) {
+		t.Errorf("Issues.ReorderIssue returned %+v, want %+v", issue, want)
 	}
 }
 
@@ -102,7 +130,7 @@ func TestMoveIssue(t *testing.T) {
 
 	issue, _, err := client.Issues.MoveIssue("1", 11, &MoveIssueOptions{ToProjectID: Ptr(5)})
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -128,7 +156,7 @@ func TestMoveIssue(t *testing.T) {
 	})
 	movedIssue, _, err := client.Issues.GetIssue("1", 11)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	wantedMovedIssue := &Issue{
@@ -179,7 +207,7 @@ func TestListIssues(t *testing.T) {
 
 	issues, _, err := client.Issues.ListIssues(listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -245,7 +273,7 @@ func TestListIssuesWithLabelDetails(t *testing.T) {
 
 	issues, _, err := client.Issues.ListIssues(listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -289,7 +317,7 @@ func TestListIssuesSearchInTitle(t *testing.T) {
 
 	issues, _, err := client.Issues.ListIssues(listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -327,7 +355,7 @@ func TestListIssuesSearchInDescription(t *testing.T) {
 
 	issues, _, err := client.Issues.ListIssues(listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -372,7 +400,7 @@ func TestListIssuesSearchByIterationID(t *testing.T) {
 
 	issues, _, err := client.Issues.ListIssues(listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -409,7 +437,7 @@ func TestListProjectIssues(t *testing.T) {
 	}
 	issues, _, err := client.Issues.ListProjectIssues("1", listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -455,7 +483,7 @@ func TestListProjectIssuesSearchByIterationID(t *testing.T) {
 
 	issues, _, err := client.Issues.ListProjectIssues(1, listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -494,7 +522,7 @@ func TestListGroupIssues(t *testing.T) {
 
 	issues, _, err := client.Issues.ListGroupIssues("1", listGroupIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -540,7 +568,7 @@ func TestListGroupIssuesSearchByIterationID(t *testing.T) {
 
 	issues, _, err := client.Issues.ListGroupIssues(1, listProjectIssue)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*Issue{{
@@ -577,7 +605,7 @@ func TestCreateIssue(t *testing.T) {
 
 	issue, _, err := client.Issues.CreateIssue("1", createIssueOptions)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -607,7 +635,7 @@ func TestUpdateIssue(t *testing.T) {
 	}
 	issue, _, err := client.Issues.UpdateIssue(1, 5, updateIssueOpt)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -633,7 +661,7 @@ func TestSubscribeToIssue(t *testing.T) {
 
 	issue, _, err := client.Issues.SubscribeToIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -659,7 +687,7 @@ func TestUnsubscribeFromIssue(t *testing.T) {
 
 	issue, _, err := client.Issues.UnsubscribeFromIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -691,7 +719,7 @@ func TestListMergeRequestsClosingIssue(t *testing.T) {
 	}
 	mergeRequest, _, err := client.Issues.ListMergeRequestsClosingIssue("1", 5, listMergeRequestsClosingIssueOpt)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*MergeRequest{{ID: 1, Title: "test merge one"}, {ID: 2, Title: "test merge two"}}
@@ -717,7 +745,7 @@ func TestListMergeRequestsRelatedToIssue(t *testing.T) {
 	}
 	mergeRequest, _, err := client.Issues.ListMergeRequestsRelatedToIssue("1", 5, listMergeRequestsRelatedToIssueOpt)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*MergeRequest{{ID: 1, Title: "test merge one"}, {ID: 2, Title: "test merge two"}}
@@ -741,7 +769,7 @@ func TestSetTimeEstimate(t *testing.T) {
 
 	timeState, _, err := client.Issues.SetTimeEstimate("1", 5, setTimeEstiOpt)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	want := &TimeStats{HumanTimeEstimate: "3h 30m", HumanTotalTimeSpent: "", TimeEstimate: 12600, TotalTimeSpent: 0}
 
@@ -760,7 +788,7 @@ func TestResetTimeEstimate(t *testing.T) {
 
 	timeState, _, err := client.Issues.ResetTimeEstimate("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	want := &TimeStats{HumanTimeEstimate: "", HumanTotalTimeSpent: "", TimeEstimate: 0, TotalTimeSpent: 0}
 
@@ -785,7 +813,7 @@ func TestAddSpentTime(t *testing.T) {
 
 	timeState, _, err := client.Issues.AddSpentTime("1", 5, addSpentTimeOpt)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	want := &TimeStats{HumanTimeEstimate: "", HumanTotalTimeSpent: "1h", TimeEstimate: 0, TotalTimeSpent: 3600}
 
@@ -805,7 +833,7 @@ func TestResetSpentTime(t *testing.T) {
 
 	timeState, _, err := client.Issues.ResetSpentTime("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &TimeStats{HumanTimeEstimate: "", HumanTotalTimeSpent: "", TimeEstimate: 0, TotalTimeSpent: 0}
@@ -825,7 +853,7 @@ func TestGetTimeSpent(t *testing.T) {
 
 	timeState, _, err := client.Issues.GetTimeSpent("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &TimeStats{HumanTimeEstimate: "2h", HumanTotalTimeSpent: "1h", TimeEstimate: 7200, TotalTimeSpent: 3600}
@@ -847,7 +875,7 @@ func TestGetIssueParticipants(t *testing.T) {
 
 	issueParticipants, _, err := client.Issues.GetParticipants("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*BasicUser{
@@ -871,7 +899,7 @@ func TestGetIssueMilestone(t *testing.T) {
 
 	issue, _, err := client.Issues.GetIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{
@@ -907,7 +935,7 @@ func TestGetIssueGroupMilestone(t *testing.T) {
 
 	issue, _, err := client.Issues.GetIssue("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := &Issue{

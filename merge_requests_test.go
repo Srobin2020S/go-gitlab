@@ -19,7 +19,6 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"testing"
@@ -166,7 +165,7 @@ func TestListProjectMergeRequests(t *testing.T) {
 	mergeRequests, _, err := client.MergeRequests.ListProjectMergeRequests(278964, &opts)
 
 	require.NoError(t, err)
-	require.Equal(t, 20, len(mergeRequests))
+	require.Equal(t, 3, len(mergeRequests))
 
 	validStates := []string{"opened", "closed", "locked", "merged"}
 	detailedMergeStatuses := []string{
@@ -346,7 +345,7 @@ func TestGetMergeRequestParticipants(t *testing.T) {
 
 	mergeRequestParticipants, _, err := client.MergeRequests.GetMergeRequestParticipants("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	want := []*BasicUser{
@@ -371,7 +370,7 @@ func TestGetMergeRequestReviewers(t *testing.T) {
 
 	mergeRequestReviewers, _, err := client.MergeRequests.GetMergeRequestReviewers("1", 5)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	createdAt := time.Date(2022, 0o7, 27, 17, 3, 27, 684000000, time.UTC)
@@ -411,8 +410,7 @@ func TestListMergeRequestDiffs(t *testing.T) {
 	})
 
 	opts := &ListMergeRequestDiffsOptions{
-		Page:    1,
-		PerPage: 2,
+		ListOptions: ListOptions{Page: 1, PerPage: 2},
 	}
 
 	diffs, _, err := client.MergeRequests.ListMergeRequestDiffs(1, 1, opts)

@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -203,6 +202,35 @@ func TestCheckResponseOnUnknownErrorFormat(t *testing.T) {
 	}
 }
 
+func TestCheckResponseOnHeadRequestError(t *testing.T) {
+	c, err := NewClient("")
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	req, err := c.NewRequest(http.MethodHead, "test", nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	resp := &http.Response{
+		Request:    req.Request,
+		StatusCode: http.StatusNotFound,
+		Body:       nil,
+	}
+
+	errResp := CheckResponse(resp)
+	if errResp == nil {
+		t.Fatal("Expected error response.")
+	}
+
+	want := "404 Not Found"
+
+	if errResp.Error() != want {
+		t.Errorf("Expected error: %s, got %s", want, errResp.Error())
+	}
+}
+
 func TestRequestWithContext(t *testing.T) {
 	c, err := NewClient("")
 	if err != nil {
@@ -221,10 +249,11 @@ func TestRequestWithContext(t *testing.T) {
 	}
 }
 
-func loadFixture(filePath string) []byte {
+func loadFixture(t *testing.T, filePath string) []byte {
+	t.Helper()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	return content
@@ -387,5 +416,41 @@ func TestPaginationPopulatePageValuesKeyset(t *testing.T) {
 		if v != gotPageHeaders[k] {
 			t.Errorf("For %s, expected %d, got %d", k, v, gotPageHeaders[k])
 		}
+	}
+}
+
+func TestExponentialBackoffLogic(t *testing.T) {
+	// Can't use the default `setup` because it disabled the backoff
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client, err := NewClient("",
+		WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Create a method that returns 429
+	mux.HandleFunc("/api/v4/projects/1", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+
+	// Measure the time at the start of the test
+	start := time.Now()
+
+	// Send a request (which will get a bunch of 429s)
+	// None of the responses matter, so ignore them all
+	_, resp, _ := client.Projects.GetProject(1, nil)
+	end := time.Now()
+
+	// The test should run for _at least_ 3,200 milliseconds
+	duration := float64(end.Sub(start))
+	if duration < float64(3200*time.Millisecond) {
+		t.Fatal("Wait was shorter than expected. Expected a minimum of 5 retries taking 3200 milliseconds, got:", duration)
+	}
+	if resp.StatusCode != 429 {
+		t.Fatal("Expected to get a 429 code given the server is hard-coded to return this. Received instead:", resp.StatusCode)
 	}
 }

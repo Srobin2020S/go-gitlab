@@ -37,6 +37,13 @@ func TestRepositoriesService_ListTree(t *testing.T) {
 		},
 	}
 
+	lto := ListTreeOptions{
+		ListOptions: ListOptions{
+			PerPage:   1,
+			PageToken: "a1e8f8d745cc87e3a9248358d9352bb7f9a0aeba",
+		},
+	}
+
 	tns, resp, err := client.Repositories.ListTree(1, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -56,6 +63,11 @@ func TestRepositoriesService_ListTree(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, tns)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	tns, resp, err = client.Repositories.ListTree(1, &lto)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, want, tns)
 }
 
 func TestRepositoriesService_Blob(t *testing.T) {
@@ -269,6 +281,7 @@ func TestRepositoriesService_Compare(t *testing.T) {
 		}},
 		CompareTimeout: false,
 		CompareSameRef: false,
+		WebURL:         "https://gitlab.example.com/thedude/gitlab-foss/-/compare/ae73cb07c9eeaf35924a10f713b364d32b2dd34f...0b4bc9a49b562e85de7cc9e834518ea6828729b9",
 	}
 
 	c, resp, err := client.Repositories.Compare("12d65c8dd2b2676fa3ac47d955accc085a37a9c1", opt, nil)

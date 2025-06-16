@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestListServices(t *testing.T) {
@@ -84,18 +85,16 @@ func TestSetCustomIssueTrackerService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/custom-issue-tracker", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetCustomIssueTrackerServiceOptions{
 		NewIssueURL: Ptr("1"),
 		IssuesURL:   Ptr("2"),
 		ProjectURL:  Ptr("3"),
-		Description: Ptr("4"),
-		Title:       Ptr("5"),
-		PushEvents:  Ptr(true),
 	}
 
-	_, err := client.Services.SetCustomIssueTrackerService(1, opt)
+	_, _, err := client.Services.SetCustomIssueTrackerService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetCustomIssueTrackerService returns an error: %v", err)
 	}
@@ -158,6 +157,7 @@ func TestSetDataDogService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/datadog", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetDataDogServiceOptions{
@@ -170,7 +170,7 @@ func TestSetDataDogService(t *testing.T) {
 		ArchiveTraceEvents: Bool(false),
 	}
 
-	_, err := client.Services.SetDataDogService(1, opt)
+	_, _, err := client.Services.SetDataDogService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetDataDogService returns an error: %v", err)
 	}
@@ -212,13 +212,14 @@ func TestSetDiscordService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/discord", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetDiscordServiceOptions{
 		WebHook: Ptr("webhook_uri"),
 	}
 
-	_, err := client.Services.SetDiscordService(1, opt)
+	_, _, err := client.Services.SetDiscordService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetDiscordService returns an error: %v", err)
 	}
@@ -260,11 +261,12 @@ func TestSetDroneCIService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/drone-ci", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
-	opt := &SetDroneCIServiceOptions{Ptr("t"), Ptr("u"), Ptr(true)}
+	opt := &SetDroneCIServiceOptions{Ptr("token"), Ptr("drone-url"), Ptr(true), nil, nil, nil}
 
-	_, err := client.Services.SetDroneCIService(1, opt)
+	_, _, err := client.Services.SetDroneCIService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetDroneCIService returns an error: %v", err)
 	}
@@ -306,11 +308,12 @@ func TestSetEmailsOnPushService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/integrations/emails-on-push", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetEmailsOnPushServiceOptions{Ptr("t"), Ptr(true), Ptr(true), Ptr(true), Ptr(true), Ptr("t")}
 
-	_, err := client.Services.SetEmailsOnPushService(1, opt)
+	_, _, err := client.Services.SetEmailsOnPushService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetEmailsOnPushService returns an error: %v", err)
 	}
@@ -329,30 +332,139 @@ func TestDeleteEmailsOnPushService(t *testing.T) {
 	}
 }
 
+func TestGetHarborService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/harbor", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1}`)
+	})
+	want := &HarborService{Service: Service{ID: 1}}
+
+	service, _, err := client.Services.GetHarborService(1)
+	if err != nil {
+		t.Fatalf("Services.GetHarborService returns an error: %v", err)
+	}
+	if !reflect.DeepEqual(want, service) {
+		t.Errorf("Services.GetHarborService returned %+v, want %+v", service, want)
+	}
+}
+
+func TestSetHarborService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/harbor", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetHarborServiceOptions{
+		URL:                  Ptr("url"),
+		ProjectName:          Ptr("project"),
+		Username:             Ptr("user"),
+		Password:             Ptr("pass"),
+		UseInheritedSettings: Ptr(false),
+	}
+
+	_, _, err := client.Services.SetHarborService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetHarborService returns an error: %v", err)
+	}
+}
+
+func TestDeleteHarborService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/harbor", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	_, err := client.Services.DeleteHarborService(1)
+	if err != nil {
+		t.Fatalf("Services.DeleteHarborService returns an error: %v", err)
+	}
+}
+
+func TestGetSlackApplication(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/gitlab-slack-application", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1}`)
+	})
+	want := &SlackApplication{Service: Service{ID: 1}}
+
+	service, _, err := client.Services.GetSlackApplication(1)
+	if err != nil {
+		t.Fatalf("Services.GetSlackApplication returns an error: %v", err)
+	}
+	if !reflect.DeepEqual(want, service) {
+		t.Errorf("Services.GetSlackApplication returned %+v, want %+v", service, want)
+	}
+}
+
+func TestSetSlackApplication(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/gitlab-slack-application", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetSlackApplicationOptions{Channel: Ptr("#channel1"), NoteEvents: Ptr(true), AlertEvents: Ptr(true)}
+
+	_, _, err := client.Services.SetSlackApplication(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetSlackApplication returns an error: %v", err)
+	}
+}
+
+func TestDisableSlackApplication(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/gitlab-slack-application", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	_, err := client.Services.DisableSlackApplication(1)
+	if err != nil {
+		t.Fatalf("Services.DisableSlackApplication returns an error: %v", err)
+	}
+}
+
 func TestGetJiraService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/0/services/jira", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodGet)
-		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": "2"}}`)
-	})
-
-	mux.HandleFunc("/api/v4/projects/1/services/jira", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodGet)
-		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": 2}}`)
-	})
-
-	mux.HandleFunc("/api/v4/projects/2/services/jira", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodGet)
-		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": "2,3"}}`)
-	})
-
-	mux.HandleFunc("/api/v4/projects/3/services/jira", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/0/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodGet)
 		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": "2"}}`)
+	})
+
+	mux.HandleFunc("/api/v4/projects/2/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": 2}}`)
+	})
+
+	mux.HandleFunc("/api/v4/projects/3/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1, "properties": {"jira_issue_transition_id": "2,3"}}`)
+	})
+
+	mux.HandleFunc("/api/v4/projects/4/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1, "properties": {"jira_auth_type": 1}}`)
+	})
+
 	want := []*JiraService{
+		{
+			Service:    Service{ID: 1},
+			Properties: &JiraServiceProperties{},
+		},
 		{
 			Service: Service{ID: 1},
 			Properties: &JiraServiceProperties{
@@ -372,8 +484,10 @@ func TestGetJiraService(t *testing.T) {
 			},
 		},
 		{
-			Service:    Service{ID: 1},
-			Properties: &JiraServiceProperties{},
+			Service: Service{ID: 1},
+			Properties: &JiraServiceProperties{
+				JiraAuthType: 1,
+			},
 		},
 	}
 
@@ -392,24 +506,103 @@ func TestGetJiraService(t *testing.T) {
 func TestSetJiraService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/1/services/jira", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetJiraServiceOptions{
-		URL:                   Ptr("asd"),
-		APIURL:                Ptr("asd"),
-		ProjectKey:            Ptr("as"),
-		Username:              Ptr("aas"),
-		Password:              Ptr("asd"),
-		Active:                Ptr(true),
-		JiraIssueTransitionID: Ptr("2,3"),
-		CommitEvents:          Ptr(true),
-		CommentOnEventEnabled: Ptr(true),
-		MergeRequestsEvents:   Ptr(true),
+		URL:                          Ptr("asd"),
+		APIURL:                       Ptr("asd"),
+		ProjectKey:                   Ptr("as"),
+		Username:                     Ptr("aas"),
+		Password:                     Ptr("asd"),
+		Active:                       Ptr(true),
+		JiraIssuePrefix:              Ptr("ASD"),
+		JiraIssueRegex:               Ptr("ASD"),
+		JiraIssueTransitionAutomatic: Ptr(true),
+		JiraIssueTransitionID:        Ptr("2,3"),
+		CommitEvents:                 Ptr(true),
+		MergeRequestsEvents:          Ptr(true),
+		CommentOnEventEnabled:        Ptr(true),
+		IssuesEnabled:                Ptr(true),
+		UseInheritedSettings:         Ptr(true),
 	}
 
-	_, err := client.Services.SetJiraService(1, opt)
+	_, _, err := client.Services.SetJiraService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetJiraService returns an error: %v", err)
+	}
+}
+
+func TestSetJiraServiceProjecKeys(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetJiraServiceOptions{
+		URL:                          Ptr("asd"),
+		APIURL:                       Ptr("asd"),
+		Username:                     Ptr("aas"),
+		Password:                     Ptr("asd"),
+		Active:                       Ptr(true),
+		JiraIssuePrefix:              Ptr("ASD"),
+		JiraIssueRegex:               Ptr("ASD"),
+		JiraIssueTransitionAutomatic: Ptr(true),
+		JiraIssueTransitionID:        Ptr("2,3"),
+		CommitEvents:                 Ptr(true),
+		MergeRequestsEvents:          Ptr(true),
+		CommentOnEventEnabled:        Ptr(true),
+		IssuesEnabled:                Ptr(true),
+		ProjectKeys:                  Ptr([]string{"as"}),
+		UseInheritedSettings:         Ptr(true),
+	}
+
+	_, _, err := client.Services.SetJiraService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetJiraService returns an error: %v", err)
+	}
+}
+
+func TestSetJiraServiceAuthTypeBasicAuth(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetJiraServiceOptions{
+		URL:          Ptr("asd"),
+		Username:     Ptr("aas"),
+		Password:     Ptr("asd"),
+		JiraAuthType: Ptr(0),
+	}
+
+	_, _, err := client.Services.SetJiraService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetJiraService returns an error: %v", err)
+	}
+}
+
+func TestSetJiraServiceAuthTypeTokenAuth(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetJiraServiceOptions{
+		URL:          Ptr("asd"),
+		Password:     Ptr("asd"),
+		JiraAuthType: Ptr(1),
+	}
+
+	_, _, err := client.Services.SetJiraService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetJiraService returns an error: %v", err)
 	}
@@ -418,7 +611,7 @@ func TestSetJiraService(t *testing.T) {
 func TestDeleteJiraService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/1/services/jira", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/1/integrations/jira", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodDelete)
 	})
 
@@ -451,6 +644,7 @@ func TestSetMattermostService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/mattermost", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetMattermostServiceOptions{
@@ -459,7 +653,7 @@ func TestSetMattermostService(t *testing.T) {
 		Channel:  Ptr("#development"),
 	}
 
-	_, err := client.Services.SetMattermostService(1, opt)
+	_, _, err := client.Services.SetMattermostService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetMasttermostService returns an error: %v", err)
 	}
@@ -475,6 +669,56 @@ func TestDeleteMattermostService(t *testing.T) {
 	_, err := client.Services.DeleteMattermostService(1)
 	if err != nil {
 		t.Fatalf("Services.DeleteMattermostService returns an error: %v", err)
+	}
+}
+
+func TestGetMattermostSlashCommandsService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1}`)
+	})
+	want := &MattermostSlashCommandsService{Service: Service{ID: 1}}
+
+	service, _, err := client.Services.GetMattermostSlashCommandsService(1)
+	if err != nil {
+		t.Fatalf("Services.mattermost-slash-commands returns an error: %v", err)
+	}
+	if !reflect.DeepEqual(want, service) {
+		t.Errorf("Services.mattermost-slash-commands returned %+v, want %+v", service, want)
+	}
+}
+
+func TestSetMattermostSlashCommandsService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetMattermostSlashCommandsServiceOptions{
+		Token:    Ptr("token"),
+		Username: Ptr("username"),
+	}
+
+	_, _, err := client.Services.SetMattermostSlashCommandsService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetMattermostSlashCommandsService returns an error: %v", err)
+	}
+}
+
+func TestDeleteMattermostSlashCommandsService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	_, err := client.Services.DeleteMattermostSlashCommandsService(1)
+	if err != nil {
+		t.Fatalf("Services.DeleteMattermostSlashCommandsService returns an error: %v", err)
 	}
 }
 
@@ -501,6 +745,7 @@ func TestSetPipelinesEmailService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/pipelines-email", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetPipelinesEmailServiceOptions{
@@ -512,7 +757,7 @@ func TestSetPipelinesEmailService(t *testing.T) {
 		PipelineEvents:            nil,
 	}
 
-	_, err := client.Services.SetPipelinesEmailService(1, opt)
+	_, _, err := client.Services.SetPipelinesEmailService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetPipelinesEmailService returns an error: %v", err)
 	}
@@ -554,11 +799,12 @@ func TestSetPrometheusService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/prometheus", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetPrometheusServiceOptions{Ptr("t"), Ptr("u"), Ptr("a")}
 
-	_, err := client.Services.SetPrometheusService(1, opt)
+	_, _, err := client.Services.SetPrometheusService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetDroneCIService returns an error: %v", err)
 	}
@@ -574,6 +820,53 @@ func TestDeletePrometheusService(t *testing.T) {
 	_, err := client.Services.DeletePrometheusService(1)
 	if err != nil {
 		t.Fatalf("Services.DeletePrometheusService returns an error: %v", err)
+	}
+}
+
+func TestGetRedmineService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/redmine", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1}`)
+	})
+	want := &RedmineService{Service: Service{ID: 1}}
+
+	service, _, err := client.Services.GetRedmineService(1)
+	if err != nil {
+		t.Fatalf("Services.GetRedmineService returns an error: %v", err)
+	}
+	if !reflect.DeepEqual(want, service) {
+		t.Errorf("Services.GetRedmineService returned %+v, want %+v", service, want)
+	}
+}
+
+func TestSetRedmineService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/redmine", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetRedmineServiceOptions{Ptr("t"), Ptr("u"), Ptr("a"), Ptr(false)}
+
+	_, _, err := client.Services.SetRedmineService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetRedmineService returns an error: %v", err)
+	}
+}
+
+func TestDeleteRedmineService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/integrations/redmine", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	_, err := client.Services.DeleteRedmineService(1)
+	if err != nil {
+		t.Fatalf("Services.DeleteRedmineService returns an error: %v", err)
 	}
 }
 
@@ -600,6 +893,7 @@ func TestSetSlackService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/slack", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetSlackServiceOptions{
@@ -608,7 +902,7 @@ func TestSetSlackService(t *testing.T) {
 		Channel:  Ptr("#development"),
 	}
 
-	_, err := client.Services.SetSlackService(1, opt)
+	_, _, err := client.Services.SetSlackService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetSlackService returns an error: %v", err)
 	}
@@ -624,57 +918,6 @@ func TestDeleteSlackService(t *testing.T) {
 	_, err := client.Services.DeleteSlackService(1)
 	if err != nil {
 		t.Fatalf("Services.DeleteSlackService returns an error: %v", err)
-	}
-}
-
-func TestGetYouTrackService(t *testing.T) {
-	mux, client := setup(t)
-
-	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodGet)
-		fmt.Fprint(w, `{"id":1}`)
-	})
-	want := &YouTrackService{Service: Service{ID: 1}}
-
-	service, _, err := client.Services.GetYouTrackService(1)
-	if err != nil {
-		t.Fatalf("Services.GetYouTrackService returns an error: %v", err)
-	}
-	if !reflect.DeepEqual(want, service) {
-		t.Errorf("Services.GetYouTrackService returned %+v, want %+v", service, want)
-	}
-}
-
-func TestSetYouTrackService(t *testing.T) {
-	mux, client := setup(t)
-
-	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodPut)
-	})
-
-	opt := &SetYouTrackServiceOptions{
-		IssuesURL:   Ptr("https://example.org/youtrack/issue/:id"),
-		ProjectURL:  Ptr("https://example.org/youtrack/projects/1"),
-		Description: Ptr("description"),
-		PushEvents:  Ptr(true),
-	}
-
-	_, err := client.Services.SetYouTrackService(1, opt)
-	if err != nil {
-		t.Fatalf("Services.SetYouTrackService returns an error: %v", err)
-	}
-}
-
-func TestDeleteYouTrackService(t *testing.T) {
-	mux, client := setup(t)
-
-	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, http.MethodDelete)
-	})
-
-	_, err := client.Services.DeleteYouTrackService(1)
-	if err != nil {
-		t.Fatalf("Services.DeleteYouTrackService returns an error: %v", err)
 	}
 }
 
@@ -701,13 +944,14 @@ func TestSetSlackSlashCommandsService(t *testing.T) {
 
 	mux.HandleFunc("/api/v4/projects/1/services/slack-slash-commands", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
 	opt := &SetSlackSlashCommandsServiceOptions{
 		Token: Ptr("token"),
 	}
 
-	_, err := client.Services.SetSlackSlashCommandsService(1, opt)
+	_, _, err := client.Services.SetSlackSlashCommandsService(1, opt)
 	if err != nil {
 		t.Fatalf("Services.SetSlackSlashCommandsService returns an error: %v", err)
 	}
@@ -726,51 +970,176 @@ func TestDeleteSlackSlashCommandsService(t *testing.T) {
 	}
 }
 
-func TestGetMattermostSlashCommandsService(t *testing.T) {
+func TestGetTelegramService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/1/services/telegram", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodGet)
-		fmt.Fprint(w, `{"id":1}`)
+		fmt.Fprint(w, `
+			{
+			  "id": 1,
+			  "title": "Telegram",
+			  "slug": "telegram",
+			  "created_at": "2023-12-16T20:21:03.117Z",
+			  "updated_at": "2023-12-16T20:22:19.140Z",
+			  "active": true,
+			  "commit_events": true,
+			  "push_events": false,
+			  "issues_events": false,
+			  "incident_events": false,
+			  "alert_events": true,
+			  "confidential_issues_events": false,
+			  "merge_requests_events": false,
+			  "tag_push_events": false,
+			  "deployment_events": false,
+			  "note_events": false,
+			  "confidential_note_events": false,
+			  "pipeline_events": true,
+			  "wiki_page_events": false,
+			  "job_events": true,
+			  "comment_on_event_enabled": true,
+			  "vulnerability_events": false,
+			  "properties": {
+				"room": "-1000000000000",
+				"notify_only_broken_pipelines": false,
+				"branches_to_be_notified": "all"
+			  }
+			}
+		`)
 	})
-	want := &MattermostSlashCommandsService{Service: Service{ID: 1}}
+	wantCreatedAt, _ := time.Parse(time.RFC3339, "2023-12-16T20:21:03.117Z")
+	wantUpdatedAt, _ := time.Parse(time.RFC3339, "2023-12-16T20:22:19.140Z")
+	want := &TelegramService{
+		Service: Service{
+			ID:                       1,
+			Title:                    "Telegram",
+			Slug:                     "telegram",
+			CreatedAt:                &wantCreatedAt,
+			UpdatedAt:                &wantUpdatedAt,
+			Active:                   true,
+			CommitEvents:             true,
+			PushEvents:               false,
+			IssuesEvents:             false,
+			AlertEvents:              true,
+			ConfidentialIssuesEvents: false,
+			MergeRequestsEvents:      false,
+			TagPushEvents:            false,
+			DeploymentEvents:         false,
+			NoteEvents:               false,
+			ConfidentialNoteEvents:   false,
+			PipelineEvents:           true,
+			WikiPageEvents:           false,
+			JobEvents:                true,
+			CommentOnEventEnabled:    true,
+			VulnerabilityEvents:      false,
+		},
+		Properties: &TelegramServiceProperties{
+			Room:                      "-1000000000000",
+			NotifyOnlyBrokenPipelines: false,
+			BranchesToBeNotified:      "all",
+		},
+	}
 
-	service, _, err := client.Services.GetMattermostSlashCommandsService(1)
+	service, _, err := client.Services.GetTelegramService(1)
 	if err != nil {
-		t.Fatalf("Services.mattermost-slash-commands returns an error: %v", err)
+		t.Fatalf("Services.GetTelegramService returns an error: %v", err)
 	}
 	if !reflect.DeepEqual(want, service) {
-		t.Errorf("Services.mattermost-slash-commands returned %+v, want %+v", service, want)
+		t.Errorf("Services.GetTelegramService returned %+v, want %+v", service, want)
 	}
 }
 
-func TestSetMattermostSlashCommandsService(t *testing.T) {
+func TestSetTelegramService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/1/services/telegram", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
 	})
 
-	opt := &SetMattermostSlashCommandsServiceOptions{
-		Token:    Ptr("token"),
-		Username: Ptr("username"),
+	opt := &SetTelegramServiceOptions{
+		Token:                     Ptr("token"),
+		Room:                      Ptr("-1000"),
+		NotifyOnlyBrokenPipelines: Ptr(true),
+		BranchesToBeNotified:      Ptr("all"),
+		PushEvents:                Ptr(true),
+		IssuesEvents:              Ptr(true),
+		ConfidentialIssuesEvents:  Ptr(true),
+		MergeRequestsEvents:       Ptr(true),
+		TagPushEvents:             Ptr(true),
+		NoteEvents:                Ptr(true),
+		ConfidentialNoteEvents:    Ptr(true),
+		PipelineEvents:            Ptr(true),
+		WikiPageEvents:            Ptr(true),
 	}
 
-	_, err := client.Services.SetMattermostSlashCommandsService(1, opt)
+	_, _, err := client.Services.SetTelegramService(1, opt)
 	if err != nil {
-		t.Fatalf("Services.SetMattermostSlashCommandsService returns an error: %v", err)
+		t.Fatalf("Services.SetTelegramService returns an error: %v", err)
 	}
 }
 
-func TestDeleteMattermostSlashCommandsService(t *testing.T) {
+func TestDeleteTelegramService(t *testing.T) {
 	mux, client := setup(t)
 
-	mux.HandleFunc("/api/v4/projects/1/services/mattermost-slash-commands", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v4/projects/1/services/telegram", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, http.MethodDelete)
 	})
 
-	_, err := client.Services.DeleteMattermostSlashCommandsService(1)
+	_, err := client.Services.DeleteTelegramService(1)
 	if err != nil {
-		t.Fatalf("Services.DeleteMattermostSlashCommandsService returns an error: %v", err)
+		t.Fatalf("Services.DeleteTelegramService returns an error: %v", err)
+	}
+}
+
+func TestGetYouTrackService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodGet)
+		fmt.Fprint(w, `{"id":1}`)
+	})
+	want := &YouTrackService{Service: Service{ID: 1}}
+
+	service, _, err := client.Services.GetYouTrackService(1)
+	if err != nil {
+		t.Fatalf("Services.GetYouTrackService returns an error: %v", err)
+	}
+	if !reflect.DeepEqual(want, service) {
+		t.Errorf("Services.GetYouTrackService returned %+v, want %+v", service, want)
+	}
+}
+
+func TestSetYouTrackService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodPut)
+		fmt.Fprint(w, `{"id":1, "properties": {}}`)
+	})
+
+	opt := &SetYouTrackServiceOptions{
+		IssuesURL:   Ptr("https://example.org/youtrack/issue/:id"),
+		ProjectURL:  Ptr("https://example.org/youtrack/projects/1"),
+		Description: Ptr("description"),
+		PushEvents:  Ptr(true),
+	}
+
+	_, _, err := client.Services.SetYouTrackService(1, opt)
+	if err != nil {
+		t.Fatalf("Services.SetYouTrackService returns an error: %v", err)
+	}
+}
+
+func TestDeleteYouTrackService(t *testing.T) {
+	mux, client := setup(t)
+
+	mux.HandleFunc("/api/v4/projects/1/services/youtrack", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, http.MethodDelete)
+	})
+
+	_, err := client.Services.DeleteYouTrackService(1)
+	if err != nil {
+		t.Fatalf("Services.DeleteYouTrackService returns an error: %v", err)
 	}
 }
